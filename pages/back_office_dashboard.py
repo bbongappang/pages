@@ -4,10 +4,11 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 import streamlit as st
+import plotly.graph_objects as go
 
 # 각 대시보드 파일 상단에 추가
 if st.sidebar.button("🏠 메인 화면으로"):
-    st.switch_page("app.py")
+    st.switch_page("main.py")
 
 # 페이지 설정
 st.set_page_config(
@@ -427,6 +428,8 @@ with col_left:
     </div>
     """, unsafe_allow_html=True)
 
+
+
 with col_right:
     # 비용 운영 효율 분석
     st.markdown("### 💰 비용 운영 효율 분석")
@@ -610,6 +613,190 @@ with col_log:
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+# ========================================
+# 신호 품질 개선 그래프 (RIS 효과 시각화)
+# ========================================
+st.markdown("### 📈 신호 품질 개선 효과 (Selective Active RIS)")
+
+# 시간 데이터 생성 (0~60초)
+time_points = list(range(0, 61))
+
+# RIS 미적용 시나리오 (신호가 떨어지고 회복 안됨)
+snr_without_ris = []
+for t in time_points:
+    if t < 20:
+        # 정상 구간
+        snr_without_ris.append(25 + np.random.normal(0, 0.5))
+    elif t < 40:
+        # 인파 밀집 지역 진입 - 신호 급락
+        drop_factor = (t - 20) / 20
+        snr_without_ris.append(25 - 18 * drop_factor + np.random.normal(0, 1))
+    else:
+        # 저품질 지속
+        snr_without_ris.append(7 + np.random.normal(0, 0.8))
+
+# Selective RIS 적용 시나리오 (신호 떨어지다가 Active Mode로 회복)
+snr_with_ris = []
+uncertainty_point = 25  # 불확실성 감지 시점
+active_start = 28       # Active Mode 활성화 시점
+
+for t in time_points:
+    if t < 20:
+        # 정상 구간
+        snr_with_ris.append(25 + np.random.normal(0, 0.5))
+    elif t < uncertainty_point:
+        # 인파 밀집 지역 진입 - 신호 하락 시작
+        drop_factor = (t - 20) / 5
+        snr_with_ris.append(25 - 8 * drop_factor + np.random.normal(0, 1))
+    elif t < active_start:
+        # 불확실성 감지, Active Mode 전환 준비
+        snr_with_ris.append(17 + np.random.normal(0, 0.8))
+    elif t < active_start + 5:
+        # Active Mode 활성화 - 급격한 신호 회복 (+32dB 증폭)
+        recovery_factor = (t - active_start) / 5
+        snr_with_ris.append(17 + 15 * recovery_factor + np.random.normal(0, 0.5))
+    else:
+        # Active Mode로 고품질 유지
+        snr_with_ris.append(32 + np.random.normal(0, 0.5))
+
+# 데이터프레임 생성
+df_signal = pd.DataFrame({
+    'Time (초)': time_points,
+    'RIS 미적용 (Passive Mode)': snr_without_ris,
+    'Selective Active RIS': snr_with_ris
+})
+
+# Plotly 그래프 생성
+import plotly.graph_objects as go
+fig = go.Figure()
+
+# RIS 미적용 라인
+fig.add_trace(go.Scatter(
+    x=df_signal['Time (초)'],
+    y=df_signal['RIS 미적용 (Passive Mode)'],
+    mode='lines',
+    name='RIS 미적용 (Passive Mode)',
+    line=dict(color='#ef4444', width=3, dash='dash'),
+    hovertemplate='시간: %{x}초<br>신호품질: %{y:.1f} dB<extra></extra>'
+))
+
+# Selective RIS 적용 라인
+fig.add_trace(go.Scatter(
+    x=df_signal['Time (초)'],
+    y=df_signal['Selective Active RIS'],
+    mode='lines',
+    name='Selective Active RIS',
+    line=dict(color='#10b981', width=3),
+    hovertemplate='시간: %{x}초<br>신호품질: %{y:.1f} dB<extra></extra>'
+))
+
+# 불확실성 감지 지점 표시 (선만)
+fig.add_vline(
+    x=uncertainty_point, 
+    line_dash="dot", 
+    line_color="#fbbf24"
+)
+
+# Active Mode 활성화 지점 표시 (선만)
+fig.add_vline(
+    x=active_start, 
+    line_dash="dot", 
+    line_color="#10b981"
+)
+
+# 레이아웃 설정
+fig.update_layout(
+    title={
+        'text': '📡 신호 품질 비교: RIS 미적용 vs Selective Active RIS',
+        'x': 0.5,
+        'xanchor': 'center',
+        'font': {'size': 18, 'color': '#00d4ff', 'family': 'Orbitron'}
+    },
+    xaxis_title='시간 (초)',
+    yaxis_title='신호 품질 (SNR, dB)',
+    hovermode='x unified',
+    plot_bgcolor='rgba(0, 0, 0, 0.3)',
+    paper_bgcolor='rgba(0, 0, 0, 0)',
+    font=dict(color='white', size=12),
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="center",
+        x=0.5,
+        bgcolor='rgba(0, 0, 0, 0.5)',
+        bordercolor='#00d4ff',
+        borderwidth=1
+    ),
+    height=400,
+    margin=dict(l=50, r=50, t=80, b=50)
+)
+
+# 그리드 및 축 스타일링
+fig.update_xaxes(
+    showgrid=True,
+    gridwidth=1,
+    gridcolor='rgba(255, 255, 255, 0.1)',
+    zeroline=False
+)
+
+fig.update_yaxes(
+    showgrid=True,
+    gridwidth=1,
+    gridcolor='rgba(255, 255, 255, 0.1)',
+    zeroline=False,
+    range=[0, 40]
+)
+
+# annotation을 별도로 추가 (레이아웃 이후에)
+fig.add_annotation(
+    x=uncertainty_point,
+    y=35,  # Y축 고정 위치
+    text="🚨 불확실성 감지",
+    showarrow=True,
+    arrowhead=2,
+    arrowcolor="#fbbf24",
+    font=dict(color="#fbbf24", size=11),
+    bgcolor="rgba(0, 0, 0, 0.7)",
+    bordercolor="#fbbf24"
+)
+
+fig.add_annotation(
+    x=active_start,
+    y=32,  # 다른 Y축 위치
+    text="⚡ Active Mode ON",
+    showarrow=True,
+    arrowhead=2,
+    arrowcolor="#10b981",
+    font=dict(color="#10b981", size=11),
+    bgcolor="rgba(0, 0, 0, 0.7)",
+    bordercolor="#10b981"
+)
+
+# 그래프 표시
+st.plotly_chart(fig, use_container_width=True)
+
+# 그래프 설명
+st.markdown("""
+<div style="background: linear-gradient(135deg, rgba(0, 212, 255, 0.1) 0%, rgba(16, 185, 129, 0.1) 100%); 
+            border: 2px solid #00d4ff; border-radius: 10px; padding: 20px; margin-top: 15px;">
+    <h4 style="color: #00d4ff; margin-top: 0;">💡 그래프 해석</h4>
+    <p style="color: white; line-height: 1.8;">
+        <strong style="color: #ef4444;">🔴 RIS 미적용 (빨간선):</strong> 
+        인파 밀집 지역(명동역) 진입 시 신호 품질이 25dB에서 7dB까지 급락하여 
+        통신 품질이 크게 저하되고 회복되지 않습니다.<br><br>
+        
+        <strong style="color: #10b981;">🟢 Selective Active RIS (초록선):</strong> 
+        불확실성 감지(25초) 후 Active Mode 전환(28초)과 동시에 
+        <strong style="color: #fbbf24;">+15dB 증폭</strong>되어 32dB의 고품질 신호로 즉시 회복됩니다.<br><br>
+        
+        <strong style="color: #00d4ff;">✅ 효과:</strong> 
+        극한 환경(인파 밀집)에서도 <strong>끊김 없는 6G 의료 서비스(URLLC)</strong>를 보장하여 
+        응급 상황에서 생명을 구하는 통신 품질을 유지합니다.
+    </p>
+</div>
+""", unsafe_allow_html=True)
 
 # 자동 새로고침
 if st.checkbox("🔄 실시간 모니터링 활성화", value=False):

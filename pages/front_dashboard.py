@@ -4,11 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 import json
-import streamlit as st
-
-# 각 대시보드 파일 상단에 추가
-if st.sidebar.button("🏠 메인 화면으로"):
-    st.switch_page("app.py")
+import random
 
 # 페이지 설정
 st.set_page_config(
@@ -17,6 +13,18 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# 세션 상태 초기화
+if 'emergency_cases' not in st.session_state:
+    st.session_state.emergency_cases = []
+if 'data_stream' not in st.session_state:
+    st.session_state.data_stream = []
+if 'processing_logs' not in st.session_state:
+    st.session_state.processing_logs = []
+
+# 메인 화면으로 돌아가기 버튼
+if st.sidebar.button("🏠 메인 화면으로"):
+    st.switch_page("main.py")
 
 # CSS 스타일링
 st.markdown("""
@@ -249,15 +257,316 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 세션 상태 초기화
-if 'data_stream' not in st.session_state:
-    st.session_state.data_stream = []
-if 'processing_logs' not in st.session_state:
-    st.session_state.processing_logs = []
+# 시뮬레이션 데이터 풀
+SIMULATION_DATA = {
+    "신고음성": [
+        {
+            "type": "신고음성",
+            "call_location": "하나고등학교 정문 앞",
+            "patient_gender": "남성",
+            "patient_age_group": "10대",
+            "witness_report": "학생이 운동장에서 쓰러졌어요. 의식이 없고 경련을 일으키고 있습니다",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "긴급",
+            "condition": "경련성 발작"
+        },
+        {
+            "type": "신고음성",
+            "call_location": "서울역 광장 분수대 근처",
+            "patient_gender": "여성",
+            "patient_age_group": "60대",
+            "witness_report": "할머니가 갑자기 쓰러지셨어요. 얼굴 한쪽이 마비된 것 같고 말을 못하세요",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "뇌졸중 의심"
+        },
+        {
+            "type": "신고음성",
+            "call_location": "강남구 테헤란로 427 현대백화점 5층 푸드코트",
+            "patient_gender": "남성",
+            "patient_age_group": "40대",
+            "witness_report": "식사 중 갑자기 가슴을 움켜쥐고 쓰러졌습니다. 식은땀 흘리고 있어요",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "심근경색 의심"
+        },
+        {
+            "type": "신고음성",
+            "call_location": "인천국제공항 제2여객터미널 출국장",
+            "patient_gender": "여성",
+            "patient_age_group": "30대",
+            "witness_report": "임산부가 배를 잡고 쓰러졌어요. 출혈이 있습니다",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "산과 응급"
+        }
+    ],
+    "웨어러블": [
+        {
+            "type": "웨어러블 기록",
+            "user_name": "김철수",
+            "user_age": 55,
+            "gps_location": "서울시 종로구 세종대로 172 (광화문 교보빌딩 앞)",
+            "gps_coordinates": "37.5703, 126.9770",
+            "heart_rate": 165,
+            "spo2": 88,
+            "activity": "걷기 중 급정지",
+            "device_alert": "⚠️ 비정상 심박수 감지 - 심방세동 의심",
+            "alert_duration": "2분 지속",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "긴급",
+            "condition": "부정맥"
+        },
+        {
+            "type": "웨어러블 기록",
+            "user_name": "이영희",
+            "user_age": 28,
+            "gps_location": "경기도 성남시 분당구 판교역로 235 (카카오 판교오피스 인근)",
+            "gps_coordinates": "37.3949, 127.1110",
+            "heart_rate": 45,
+            "blood_glucose": 42,
+            "activity": "정지 상태",
+            "device_alert": "⚠️ 심각한 저혈당 감지 - 의식 저하 가능성",
+            "alert_duration": "5분 지속",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "저혈당"
+        },
+        {
+            "type": "웨어러블 기록",
+            "user_name": "박민수",
+            "user_age": 62,
+            "gps_location": "부산광역시 해운대구 우동 1408 (해운대 해수욕장 산책로)",
+            "gps_coordinates": "35.1588, 129.1603",
+            "heart_rate": 142,
+            "blood_pressure": "185/115",
+            "activity": "조깅 중",
+            "device_alert": "⚠️ 고혈압 위험 수준 - 운동 중 심혈관 이상 감지",
+            "alert_duration": "1분 지속",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "긴급",
+            "condition": "고혈압성 응급"
+        },
+        {
+            "type": "웨어러블 기록",
+            "user_name": "최지은",
+            "user_age": 19,
+            "gps_location": "대전광역시 유성구 대학로 99 (KAIST 본관 앞)",
+            "gps_coordinates": "36.3741, 127.3650",
+            "heart_rate": 0,
+            "spo2": 0,
+            "fall_detected": True,
+            "device_alert": "🚨 낙상 감지 및 생체신호 미감지 - 즉시 대응 필요",
+            "alert_duration": "30초 경과",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "심정지 의심"
+        }
+    ],
+    "현장처치": [
+        {
+            "type": "현장 처치 기록",
+            "patient_estimated_age": "20대 후반",
+            "patient_gender": "남성",
+            "first_aid": ["기도 확보", "경추 고정", "산소 투여 (15L/min)", "정맥로 확보"],
+            "current_status": "의식 명료, GCS 15점, 경추 통증 호소",
+            "injury": "교통사고 (오토바이), 목 통증 및 우측 상지 골절 의심",
+            "urgency_level": "준긴급",
+            "transport_time": "현장 도착 후 12분",
+            "destination": "이송 중 - 삼성서울병원 응급실",
+            "eta": "5분 후 도착 예정",
+            "ambulance_id": "강남119-05",
+            "location": "서울시 강남구 테헤란로 (강남역 사거리)",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "준긴급",
+            "condition": "경추 손상 의심"
+        },
+        {
+            "type": "현장 처치 기록",
+            "patient_estimated_age": "70대 초반",
+            "patient_gender": "여성",
+            "first_aid": ["CPR 실시 (5분)", "제세동 1회 실시", "기관 삽관", "에피네프린 1mg 투여"],
+            "current_status": "자발 순환 회복, 의식 혼미, GCS 8점",
+            "injury": "심정지 (목격자 CPR 실시됨)",
+            "urgency_level": "최고긴급",
+            "transport_time": "현장 도착 후 18분",
+            "destination": "이송 중 - 서울아산병원 응급실",
+            "eta": "3분 후 도착 예정",
+            "ambulance_id": "송파119-02",
+            "location": "서울시 송파구 올림픽로 (롯데월드타워 인근)",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "심정지 소생 후"
+        },
+        {
+            "type": "현장 처치 기록",
+            "patient_estimated_age": "50대 중반",
+            "patient_gender": "남성",
+            "first_aid": ["상처 지혈 및 드레싱", "파상풍 예방 조치", "진통제 투여"],
+            "current_status": "의식 명료, 우측 대퇴부 열상 출혈 조절됨",
+            "injury": "작업장 사고 - 우측 하지 열상 (길이 15cm, 깊이 3cm)",
+            "urgency_level": "비긴급",
+            "transport_time": "현장 도착 후 8분",
+            "destination": "이송 중 - 인천의료원",
+            "eta": "7분 후 도착 예정",
+            "ambulance_id": "인천119-14",
+            "location": "인천광역시 남동구 논현동 공단",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "경증",
+            "condition": "외상"
+        },
+        {
+            "type": "현장 처치 기록",
+            "patient_estimated_age": "30대 후반",
+            "patient_gender": "여성",
+            "first_aid": ["산소 투여", "정맥로 확보", "항히스타민제 투여", "에피네프린 근육주사"],
+            "current_status": "호흡곤란 호전 중, 의식 명료, 두드러기 지속",
+            "injury": "아나필락시스 쇼크 (새우 섭취 후)",
+            "urgency_level": "긴급",
+            "transport_time": "현장 도착 후 6분",
+            "destination": "이송 중 - 세브란스병원 응급실",
+            "eta": "4분 후 도착 예정",
+            "ambulance_id": "서대문119-03",
+            "location": "서울시 서대문구 연세로 (신촌역 인근)",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "긴급",
+            "condition": "알레르기 쇼크"
+        }
+    ],
+    "영상스트리밍": [
+        {
+            "type": "영상 스트리밍",
+            "visual_status": "환자 의식 저하, 우측 안면 처짐, 우측 팔 마비 확인됨",
+            "patient_age_group": "60대",
+            "patient_gender": "남성",
+            "symptoms_observed": ["언어 장애", "편측 마비", "안면 비대칭"],
+            "onset_time": "15분 전 증상 시작",
+            "last_normal_time": "20분 전",
+            "current_action": "구급차 이송 중, 산소 투여 중",
+            "ambulance_id": "경기119-22",
+            "location": "경기도 수원시 영통구 광교중앙로",
+            "eta_to_hospital": "8분",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "뇌졸중"
+        },
+        {
+            "type": "영상 스트리밍",
+            "visual_status": "소아 환자 발열 및 경련 중, 입술 청색증 보임",
+            "patient_age_group": "5세",
+            "patient_gender": "남성",
+            "symptoms_observed": ["고열 (39.8°C)", "전신 경련", "청색증"],
+            "onset_time": "5분 전 경련 시작",
+            "seizure_duration": "3분 지속 후 멈춤",
+            "current_action": "측와위 유지, 산소 투여, 해열제 투여 준비",
+            "ambulance_id": "광주119-08",
+            "location": "광주광역시 서구 상무대로",
+            "eta_to_hospital": "5분",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "긴급",
+            "condition": "열성경련"
+        },
+        {
+            "type": "영상 스트리밍",
+            "visual_status": "복부 팽만 및 압통, 환자 창백하고 식은땀 흘림",
+            "patient_age_group": "40대",
+            "patient_gender": "남성",
+            "symptoms_observed": ["복부 강직", "저혈압 (80/50)", "빈맥 (HR 125)"],
+            "onset_time": "30분 전 증상 시작",
+            "injury_mechanism": "사다리에서 3m 높이 추락",
+            "current_action": "수액 급속 투여 중, 쇼크 체위 유지",
+            "ambulance_id": "대전119-11",
+            "location": "대전광역시 서구 둔산대로",
+            "eta_to_hospital": "6분",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "복부 내출혈 의심"
+        },
+        {
+            "type": "영상 스트리밍",
+            "visual_status": "산모 출혈 지속, 태아 만출 임박 상태",
+            "patient_age_group": "30대",
+            "patient_gender": "여성",
+            "symptoms_observed": ["질 출혈", "규칙적 진통 (2분 간격)", "태아 머리 보임"],
+            "onset_time": "20분 전 진통 시작",
+            "gestation_week": "임신 38주",
+            "current_action": "분만 준비 중, 산모 안정화",
+            "ambulance_id": "울산119-06",
+            "location": "울산광역시 남구 삼산로",
+            "eta_to_hospital": "4분 (산부인과 전문병원)",
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "severity": "매우긴급",
+            "condition": "응급 분만"
+        }
+    ]
+}
 
 # 헤더
 st.markdown('<h1 class="main-title">🎯 FIELD-DREAM Front</h1>', unsafe_allow_html=True)
 st.markdown('<p class="subtitle">계층형 메모리 & 실시간 데이터 처리 모니터링</p>', unsafe_allow_html=True)
+
+# 시뮬레이션 버튼 섹션
+st.markdown("---")
+st.subheader("🎮 응급 상황 시뮬레이션")
+st.caption("버튼을 클릭하여 다양한 응급 상황을 생성하고 Mid Office 대시보드에서 확인하세요")
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    if st.button("📞 신고음성", use_container_width=True):
+        case = random.choice(SIMULATION_DATA["신고음성"])
+        st.session_state.emergency_cases.append(case)
+        st.success(f"📞 신고 접수\n📍 {case['call_location']}\n👤 {case['patient_age_group']} {case['patient_gender']}\n💬 {case['witness_report'][:30]}...")
+
+with col2:
+    if st.button("⌚ 웨어러블 기록", use_container_width=True):
+        case = random.choice(SIMULATION_DATA["웨어러블"])
+        st.session_state.emergency_cases.append(case)
+        st.success(f"⌚ 웨어러블 감지\n👤 {case['user_name']} ({case['user_age']}세)\n📍 {case['gps_location']}\n⚠️ {case['device_alert'][:35]}...")
+
+with col3:
+    if st.button("🏥 현장 처치 기록", use_container_width=True):
+        case = random.choice(SIMULATION_DATA["현장처치"])
+        st.session_state.emergency_cases.append(case)
+        st.success(f"🚑 현장 처치 진행\n🚨 {case['ambulance_id']}\n👤 {case['patient_estimated_age']} {case['patient_gender']}\n⏱️ 이송 시간: {case['transport_time']}")
+
+with col4:
+    if st.button("📹 영상 스트리밍", use_container_width=True):
+        case = random.choice(SIMULATION_DATA["영상스트리밍"])
+        st.session_state.emergency_cases.append(case)
+        st.success(f"📹 영상 수신\n🚨 {case['ambulance_id']}\n👁️ {case['visual_status'][:40]}...\n⏱️ 발생: {case['onset_time']}")
+
+# 최근 케이스 표시
+if st.session_state.emergency_cases:
+    with st.expander(f"📋 최근 생성된 케이스 ({len(st.session_state.emergency_cases)}건)", expanded=True):
+        for idx, case in enumerate(reversed(st.session_state.emergency_cases[-5:]), 1):
+            # 케이스 타입별로 다른 필드 사용
+            if case['type'] == "신고음성":
+                location = case.get('call_location', '위치 정보 없음')
+                patient_info = f"{case.get('patient_age_group', '-')} {case.get('patient_gender', '-')}"
+            elif case['type'] == "웨어러블 기록":
+                location = case.get('gps_location', '위치 정보 없음')
+                patient_info = f"{case.get('user_name', '-')} ({case.get('user_age', '-')}세)"
+            elif case['type'] == "현장 처치 기록":
+                location = case.get('location', '위치 정보 없음')
+                patient_info = f"{case.get('patient_estimated_age', '-')} {case.get('patient_gender', '-')}"
+            elif case['type'] == "영상 스트리밍":
+                location = case.get('location', '위치 정보 없음')
+                patient_info = f"{case.get('patient_age_group', '-')} {case.get('patient_gender', '-')}"
+            else:
+                location = "위치 정보 없음"
+                patient_info = "-"
+            
+            st.markdown(f"""
+            **케이스 #{len(st.session_state.emergency_cases) - idx + 1}** - {case['type']}
+            - 📍 위치: {location}
+            - 👤 환자: {patient_info}
+            - 🚨 상태: {case.get('condition', '-')}
+            - ⏰ 시각: {case.get('time', '-')}
+            """)
+            st.markdown("---")
+
+st.markdown("---")
 
 # 현재 시간
 current_time = datetime.now()
