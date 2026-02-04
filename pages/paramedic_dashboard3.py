@@ -7,7 +7,7 @@ import streamlit as st
 
 # 각 대시보드 파일 상단에 추가
 if st.sidebar.button("🏠 메인 화면으로"):
-    st.switch_page("main.py")
+    st.switch_page("app.py")
 
 # 페이지 설정
 st.set_page_config(

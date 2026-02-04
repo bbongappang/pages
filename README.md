@@ -39,12 +39,17 @@ streamlit run pages/main.py
 ## 📁 프로젝트 구조
 
 ```
-pages/
-├── main.py                    # 메인 페이지 (네비게이션)
-├── front_dashboard.py         # 현장 응급 관리 대시보드
-├── hospital_dashboard3.py     # 병원 관제 대시보드
-├── paramedic_dashboard3.py    # 구급차 관리 대시보드
-└── back_office_dashboard.py   # 백오피스 시스템 관리
+.
+├── app.py                     # 메인 진입점 (네비게이션)
+├── pages/
+│   ├── front_dashboard.py     # 현장 응급 관리 대시보드
+│   ├── hospital_dashboard3.py # 병원 관제 대시보드
+│   ├── paramedic_dashboard3.py # 구급차 관리 대시보드
+│   └── back_office_dashboard.py # 백오피스 시스템 관리
+├── requirements.txt           # 필수 Python 패키지
+├── .streamlit/
+│   └── config.toml           # Streamlit 설정
+└── README.md                  # 프로젝트 설명
 ```
 
 ## 🔧 기술 스택
